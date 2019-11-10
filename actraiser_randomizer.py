@@ -64,6 +64,21 @@ parser.add_argument(
     type = int,
     help = "specify the RNG seed value"
 )
+forcePathGroup = parser.add_mutually_exclusive_group()
+forcePathGroup.add_argument(
+    "--force-left",
+    action = "store_const",
+    const = "left",
+    dest = "force_path",
+    help = "use the left path in Marahna II"
+)
+forcePathGroup.add_argument(
+    "--force-right",
+    action = "store_const",
+    const = "right",
+    dest = "force_path",
+    help = "use the right path in Marahna II"
+)
 parser.add_argument(
     "-n", "--dry-run",
     action = "store_true",
@@ -74,6 +89,12 @@ parser.add_argument(
     action = "count",
     help = "print spoiler log"
 )
+# This option should be named "input-file". It isn't because of a bug with
+# dash-to-underscore replacement for positional arguments:
+# https://bugs.python.org/issue15125
+# Solution: Name the option "input_file" so we can use "args.input_file" to
+# get its value, and set "metavar" so the name appears as "input-file" in
+# help messages.
 parser.add_argument(
     "input_file",
     metavar = "input-file",
@@ -101,7 +122,20 @@ seed %= 2**32
 print("RNG seed: {}".format(seed))
 rng.seed(seed)
 
-templeChoice = rng.choice(["left", "right"])
+# Always do the coin flip, even if we're going to override the result.
+# This way, the shuffled map order for a given seed will stay the same, even
+# if the chosen force-path option (left, right or unspecified) changes.
+marahnaCoinFlip = rng.choice(["left", "right"])
+if args.force_path:
+    if args.verbose:
+        print("Marahna II path: {}".format(marahnaCoinFlip))
+    marahnaPath = args.force_path
+    print("Marahna II path: {} (forced by command-line option)".format(marahnaPath))
+else:
+    marahnaPath = marahnaCoinFlip
+    if args.verbose:
+        print("Marahna II path: {}".format(marahnaPath))
+
 mapNumbers = [
     0x101,
     0x102, 0x103, 0x104,
@@ -112,7 +146,7 @@ mapNumbers = [
     0x401, 0x402, 0x403,
     0x404, 0x405, 0x406, 0x407,
     0x501, 0x502, 0x503,
-    0x504, 0x505, (0x506 if templeChoice == "left" else 0x507), 0x508,
+    0x504, 0x505, (0x506 if marahnaPath == "left" else 0x507), 0x508,
     0x601, 0x602, 0x603, 0x604,
     0x605, 0x606, 0x607, 0x608,
 ]
@@ -121,7 +155,6 @@ mapNumbers.append(0x701)
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
-    print("Marahna II path: {}".format(templeChoice))
     for mapNumber in mapNumbers:
         print("{:3X} ".format(mapNumber), end="")
     print()
@@ -155,7 +188,12 @@ if not args.dry_run:
     # We need more space than the "START" option text provides, so we'll
     # repurpose the space used by the "CONTINUE" / "NEW GAME" option text.
     struct.pack_into("<H", romBytes, 0x12715, 0xA9A7)
-    menuBytes = "> START < {}".format(seed).center(32).encode("ascii")
+    menuString = "> START < {}".format(seed)
+    if args.force_path == "left":
+        menuString += "-L"
+    elif args.force_path == "right":
+        menuString += "-R"
+    menuBytes = menuString.center(32).encode("ascii")
     struct.pack_into("{}s".format(len(menuBytes) + 1), romBytes, 0x129A7, menuBytes)
 
     # Always enter Professional Mode from the initial menu.
@@ -198,9 +236,17 @@ if not args.dry_run:
     # Write the output file.
     outFileName = args.output_file
     if outFileName is None:
+        suffix = "_{}".format(seed)
+        if args.force_path == "left":
+            suffix += "_L"
+        elif args.force_path == "right":
+            suffix += "_R"
+
         basename, dot, extension = inFileName.rpartition(".")
-        if basename and dot:
-            basename = "{}_{}".format(basename, seed)
+        if basename and extension:
+            basename += suffix
+        else:
+            extension += suffix
         outFileName = basename + dot + extension
 
     with open(outFileName, "xb") as outFile:
