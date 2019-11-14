@@ -155,8 +155,10 @@ mapNumbers.append(0x701)
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
-    for mapNumber in mapNumbers:
+    for i, mapNumber in enumerate(mapNumbers, 1):
         print("{:3X} ".format(mapNumber), end="")
+        if i % 10 == 0:
+            print()
     print()
 
 if not args.dry_run:
@@ -200,18 +202,128 @@ if not args.dry_run:
     romBytes[0x40] = 0xEA
     romBytes[0x41] = 0xEA
 
-    # Skip the "descending ball of light brings statue to life" animation.
-    # On some maps, it causes you to take unavoidable damage.
-    romBytes[0x12B0D] = 0x9C
-
-    # Make both exits from Marahna II.b go to the same destination map.
-    romBytes[0x6702] = 0xEA
-
     # In the event of player death, respawn on the same map.
     romBytes[0x13D61] = 0xEA
     romBytes[0x13D62] = 0xEA
     romBytes[0x13D63] = 0xA5
     romBytes[0x13D64] = 0x19
+
+    # Add a room counter to the HUD.
+    # You can't get or use magic in Professional Mode, so this feature
+    # repurposes storage and memory normally used by magic.
+
+    # Replace the code that draws a scroll for each MP you have (always zero
+    # in Professional Mode) with code to display the room counter.
+    romBytes[0x142C8] = 0xE2 # SEP #$20
+    romBytes[0x142C9] = 0x20
+    romBytes[0x142CA] = 0xA5 # LDA $21
+    romBytes[0x142CB] = 0x21
+    romBytes[0x142CC] = 0x4A # LSR
+    romBytes[0x142CD] = 0x4A # LSR
+    romBytes[0x142CE] = 0x4A # LSR
+    romBytes[0x142CF] = 0x4A # LSR
+    romBytes[0x142D0] = 0x09 # ORA #$30
+    romBytes[0x142D1] = 0x30
+    romBytes[0x142D2] = 0x8F # STA $7FB046
+    romBytes[0x142D3] = 0x46
+    romBytes[0x142D4] = 0xB0
+    romBytes[0x142D5] = 0x7F
+    romBytes[0x142D6] = 0xA5 # LDA $21
+    romBytes[0x142D7] = 0x21
+    romBytes[0x142D8] = 0x29 # AND #$0F
+    romBytes[0x142D9] = 0x0F
+    romBytes[0x142DA] = 0x09 # ORA #$30
+    romBytes[0x142DB] = 0x30
+    romBytes[0x142DC] = 0x8F # STA $7FB048
+    romBytes[0x142DD] = 0x48
+    romBytes[0x142DE] = 0xB0
+    romBytes[0x142DF] = 0x7F
+    romBytes[0x142E0] = 0xEA # NOP
+    romBytes[0x142E1] = 0xEA # NOP
+    romBytes[0x142E2] = 0xEA # NOP
+    romBytes[0x142E3] = 0xEA # NOP
+    romBytes[0x142E4] = 0xEA # NOP
+    romBytes[0x142E5] = 0xEA # NOP
+    romBytes[0x142E6] = 0xEA # NOP
+    romBytes[0x142E7] = 0xEA # NOP
+
+    # Update the HUD's fixed content to replace "[ACT]" with the person icon
+    # and two reserved spaces for the room counter's digits.
+    struct.pack_into("<H", romBytes, 0x10E7E, 0x0000)
+    struct.pack_into("<H", romBytes, 0x10E80, 0x003A)
+    struct.pack_into("<H", romBytes, 0x10E82, 0x003B)
+    struct.pack_into("<H", romBytes, 0x10E84, 0x0030)
+    struct.pack_into("<H", romBytes, 0x10E86, 0x0030)
+    struct.pack_into("<H", romBytes, 0x10E88, 0x0000)
+
+    # Update the HUD's fixed content to not show ten MP scrolls.
+    # For some reason, the fixed content has the variable fields filled in
+    # (mostly with zeroes, but for MP, with ten scroll icons). Without the
+    # scroll-drawing code, there's nothing to erase them, so let's remove
+    # them here.
+    for offset in range(0x10EE8, 0x10EFC, 0x2):
+        struct.pack_into("<H", romBytes, offset, 0x0000)
+
+    # Update the map-changing function to increment the room counter.
+    # There's not enough space in the map-changing function for all of the
+    # new code, so let's put in a subroutine call to some unused space...
+    romBytes[0x26C] = 0x22 # JSL $00FF40
+    romBytes[0x26D] = 0x40
+    romBytes[0x26E] = 0xFF
+    romBytes[0x26F] = 0x00
+    # ...and write the new code into that unused space.
+    # If the map change is happening because of player death, don't advance
+    # the room counter.
+    romBytes[0x7F40] = 0xAD # LDA $032C
+    romBytes[0x7F41] = 0x2C
+    romBytes[0x7F42] = 0x03
+    romBytes[0x7F43] = 0xD0 # BNE $7F60
+    romBytes[0x7F44] = 0x1B
+    # If the current map is the Death Heim hub (0x701), and the destination
+    # map is one of the Death Heim boss rooms (0x7##), don't advance the
+    # room counter.
+    romBytes[0x7F45] = 0xA5 # LDA $18
+    romBytes[0x7F46] = 0x18
+    romBytes[0x7F47] = 0xC9 # CMP #$07
+    romBytes[0x7F48] = 0x07
+    romBytes[0x7F49] = 0xD0 # BNE $7F57
+    romBytes[0x7F4A] = 0x0C
+    romBytes[0x7F4B] = 0xA5 # LDA $19
+    romBytes[0x7F4C] = 0x19
+    romBytes[0x7F4D] = 0xC9 # CMP #$01
+    romBytes[0x7F4E] = 0x01
+    romBytes[0x7F4F] = 0xD0 # BNE $7F57
+    romBytes[0x7F50] = 0x06
+    romBytes[0x7F51] = 0xA5 # LDA $1B
+    romBytes[0x7F52] = 0x1B
+    romBytes[0x7F53] = 0xC9 # CMP #$07
+    romBytes[0x7F54] = 0x07
+    romBytes[0x7F55] = 0xF0 # BEQ $7F60
+    romBytes[0x7F56] = 0x09
+    # Advance the room counter.
+    romBytes[0x7F57] = 0xF8 # SED
+    romBytes[0x7F58] = 0xA5 # LDA $21
+    romBytes[0x7F59] = 0x21
+    romBytes[0x7F5A] = 0x18 # CLC
+    romBytes[0x7F5B] = 0x69 # ADC #$01
+    romBytes[0x7F5C] = 0x01
+    romBytes[0x7F5D] = 0x85 # STA $21
+    romBytes[0x7F5E] = 0x21
+    romBytes[0x7F5F] = 0xD8 # CLD
+    # Do the instructions that were overwritten by the subroutine call.
+    romBytes[0x7F60] = 0xA5 # LDA $1A
+    romBytes[0x7F61] = 0x1A
+    romBytes[0x7F62] = 0x85 # STA $19
+    romBytes[0x7F63] = 0x19
+    # Return.
+    romBytes[0x7F64] = 0x6B # RTL
+
+    # Skip the "descending ball of light brings statue to life" animation.
+    # On some maps, it causes the player to take unavoidable damage.
+    romBytes[0x12B0D] = 0x9C
+
+    # Make both exits from Marahna II.b go to the same destination map.
+    romBytes[0x6702] = 0xEA
 
     # Prevent animated tiles from glitching.
     # Not sure exactly why the glitching occurs, but this change fixes it.
