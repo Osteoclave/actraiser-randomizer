@@ -64,37 +64,37 @@ parser.add_argument(
     type = int,
     help = "specify the RNG seed value"
 )
-forcePathGroup = parser.add_mutually_exclusive_group()
-forcePathGroup.add_argument(
-    "--force-left",
-    action = "store_const",
-    const = "left",
-    dest = "force_path",
-    help = "use the left path in Marahna II"
-)
-forcePathGroup.add_argument(
-    "--force-right",
-    action = "store_const",
-    const = "right",
-    dest = "force_path",
-    help = "use the right path in Marahna II"
+parser.add_argument(
+    "-v", "--verbose",
+    action = "count",
+    help = "print spoiler log"
 )
 parser.add_argument(
     "-n", "--dry-run",
     action = "store_true",
     help = "execute without saving any changes"
 )
-parser.add_argument(
-    "-v", "--verbose",
-    action = "count",
-    help = "print spoiler log"
+forcePathGroup = parser.add_mutually_exclusive_group()
+forcePathGroup.add_argument(
+    "-L", "--left-path",
+    action = "store_const",
+    const = "left",
+    dest = "force_path",
+    help = "use the left path in Marahna II"
+)
+forcePathGroup.add_argument(
+    "-R", "--right-path",
+    action = "store_const",
+    const = "right",
+    dest = "force_path",
+    help = "use the right path in Marahna II"
 )
 # This option should be named "input-file". It isn't because of a bug with
 # dash-to-underscore replacement for positional arguments:
 # https://bugs.python.org/issue15125
-# Solution: Name the option "input_file" so we can use "args.input_file" to
-# get its value, and set "metavar" so the name appears as "input-file" in
-# help messages.
+# Workaround: Name the option "input_file" so we can use "args.input_file"
+# to get its value, and set "metavar" so the name appears as "input-file"
+# in help messages.
 parser.add_argument(
     "input_file",
     metavar = "input-file",
@@ -199,6 +199,10 @@ if not args.dry_run:
     # Always enter Professional Mode from the initial menu.
     romBytes[0x40] = 0xEA
     romBytes[0x41] = 0xEA
+
+    # Skip the "descending ball of light brings statue to life" animation.
+    # On some maps, it causes you to take unavoidable damage.
+    romBytes[0x12B0D] = 0x9C
 
     # Make both exits from Marahna II.b go to the same destination map.
     romBytes[0x6702] = 0xEA
