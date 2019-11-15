@@ -52,6 +52,7 @@ exits = {
     0x606 : 0x67AC,
     0x607 : 0x67B7,
     0x608 : None,
+    0x701 : None,
 }
 
 
@@ -149,13 +150,19 @@ mapNumbers = [
     0x504, 0x505, (0x506 if marahnaPath == "left" else 0x507), 0x508,
     0x601, 0x602, 0x603, 0x604,
     0x605, 0x606, 0x607, 0x608,
+    0x701,
 ]
 rng.shuffle(mapNumbers)
-mapNumbers.append(0x701)
+mapNumbers.append(0x801)
+
+bossRush = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707, 0x708,]
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
-    for i, mapNumber in enumerate(mapNumbers, 1):
+    spoilerLog = mapNumbers[:-1]
+    bossRushIndex = spoilerLog.index(0x701)
+    spoilerLog[bossRushIndex:bossRushIndex] = bossRush
+    for i, mapNumber in enumerate(spoilerLog, 1):
         print("{:3X} ".format(mapNumber), end="")
         if i % 10 == 0:
             print()
