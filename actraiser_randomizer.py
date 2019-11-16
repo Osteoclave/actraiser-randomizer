@@ -156,6 +156,7 @@ rng.shuffle(mapNumbers)
 mapNumbers.append(0x801)
 
 bossRush = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707, 0x708,]
+rng.shuffle(bossRush)
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
@@ -355,6 +356,93 @@ if not args.dry_run:
         else:
             struct.pack_into(">H", romBytes, professionalModeOffset, nextMapNumber)
             professionalModeOffset += 2
+
+    # Update the boss rush.
+    # After defeating a boss, take away the sword upgrade (so you don't keep
+    # it after fighting Tanzra), and advance the boss rush counter by adding
+    # one (instead of setting it based on the boss room's map number).
+    romBytes[0x7EEC] = 0xE2 # SEP #$20
+    romBytes[0x7EED] = 0x20
+    romBytes[0x7EEE] = 0x64 # STZ $E4
+    romBytes[0x7EEF] = 0xE4
+    romBytes[0x7EF0] = 0xC2 # REP #$20
+    romBytes[0x7EF1] = 0x20
+    romBytes[0x7EF2] = 0xEE # INC $0347
+    romBytes[0x7EF3] = 0x47
+    romBytes[0x7EF4] = 0x03
+
+    # Write the new boss rush order to some unused space.
+    for i, boss in enumerate(bossRush):
+        struct.pack_into("<H", romBytes, 0x7F80 + (i*2), boss)
+
+    # Use the new boss rush order.
+    romBytes[0x73E2] = 0xDA # PHX
+    romBytes[0x73E3] = 0xAD # LDA $0347
+    romBytes[0x73E4] = 0x47
+    romBytes[0x73E5] = 0x03
+    romBytes[0x73E6] = 0x0A # ASL
+    romBytes[0x73E7] = 0xAA # TAX
+    romBytes[0x73E8] = 0xBD # LDA $FF80,X
+    romBytes[0x73E9] = 0x80
+    romBytes[0x73EA] = 0xFF
+    romBytes[0x73EB] = 0x85 # STA $1A
+    romBytes[0x73EC] = 0x1A
+    romBytes[0x73ED] = 0xFA # PLX
+    romBytes[0x73EE] = 0xEA # NOP
+    romBytes[0x73EF] = 0xEA # NOP
+
+    # Update the order of faces in the Death Heim hub.
+    bossRushFaces = {
+        0x702 : bytes.fromhex("01 09 00 0C 01 09 00 0F"),
+        0x703 : bytes.fromhex("0F 09 00 0D 0F 09 00 10"),
+        0x704 : bytes.fromhex("03 08 00 0C 03 08 00 0F"),
+        0x705 : bytes.fromhex("0C 08 00 16 0D 08 00 10"),
+        0x706 : bytes.fromhex("05 07 00 0C 05 07 00 0F"),
+        0x707 : bytes.fromhex("0B 07 00 0D 0B 07 00 10"),
+        0x708 : bytes.fromhex("08 07 00 0E 08 05 00 11"),
+    }
+    for i, boss in enumerate(bossRush):
+        faceOffset = 0x54432 + (i*8)
+        romBytes[faceOffset:faceOffset+8] = bossRushFaces[boss]
+
+    # The unmodified code uses a loop to control the eyes and gems of the
+    # first six faces, with Tanzra's eyes and gem working separately. Let's
+    # simplify things by making Tanzra's face work like the others.
+    # First, Tanzra's eyes...
+    romBytes[0x7467] = 0xBD # LDA $0038,X
+    romBytes[0x7468] = 0x38
+    romBytes[0x7469] = 0x00
+    romBytes[0x746A] = 0xF0 # BEQ $F482
+    romBytes[0x746B] = 0x16
+    romBytes[0x746C] = 0x30 # BMI $F47C
+    romBytes[0x746D] = 0x0E
+    romBytes[0x746E] = 0xEA # NOP
+    romBytes[0x746F] = 0xEA # NOP
+    romBytes[0x7470] = 0xEA # NOP
+    romBytes[0x7471] = 0xEA # NOP
+    romBytes[0x7472] = 0xEA # NOP
+    romBytes[0x7473] = 0xEA # NOP
+    # ...then Tanzra's gem.
+    romBytes[0x74CB] = 0xBD # LDA $0038,X
+    romBytes[0x74CC] = 0x38
+    romBytes[0x74CD] = 0x00
+    romBytes[0x74CE] = 0x10 # BPL $F4DF
+    romBytes[0x74CF] = 0x0F
+    romBytes[0x74D0] = 0xEA # NOP
+    romBytes[0x74D1] = 0xEA # NOP
+    romBytes[0x74D2] = 0xEA # NOP
+
+    # Change the conditions that break the loop.
+    # Wait until after we've dimmed the eyes and shattered the gem of the
+    # current face to try breaking the loop.
+    romBytes[0x7558] = 0xEA
+    romBytes[0x7559] = 0xEA
+    romBytes[0x755A] = 0xEA
+    romBytes[0x755B] = 0xEA
+    romBytes[0x755C] = 0xEA
+    # Break the loop if all of the bosses have been defeated.
+    romBytes[0x7581] = 0x07
+    romBytes[0x7584] = 0x24
 
     # Write the output file.
     outFileName = args.output_file
