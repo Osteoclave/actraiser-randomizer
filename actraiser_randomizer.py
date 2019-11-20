@@ -10,53 +10,6 @@ import struct
 
 
 
-exits = {
-    0x101 : None,
-    0x102 : 0x3031,
-    0x103 : 0x303C,
-    0x104 : None,
-    0x201 : None,
-    0x202 : 0x392C,
-    0x203 : 0x393A,
-    0x204 : 0x3948,
-    0x205 : 0x3956,
-    0x206 : 0x3964,
-    0x207 : 0x3972,
-    0x208 : None,
-    0x301 : 0x415F,
-    0x302 : None,
-    0x303 : 0x416D,
-    0x304 : 0x4187,
-    0x305 : 0x419D,
-    0x306 : None,
-    0x401 : 0x4DEC,
-    0x402 : 0x4DFA,
-    0x403 : None,
-    0x404 : 0x4E10,
-    0x405 : 0x4E1E,
-    0x406 : 0x4E34,
-    0x407 : None,
-    0x501 : 0x66C7,
-    0x502 : 0x66D5,
-    0x503 : None,
-    0x504 : 0x66EB,
-    0x505 : 0x66F9,
-    0x506 : 0x671D,
-    0x507 : 0x671D,
-    0x508 : None,
-    0x601 : 0x6767,
-    0x602 : 0x6775,
-    0x603 : 0x678B,
-    0x604 : None,
-    0x605 : 0x67A1,
-    0x606 : 0x67AC,
-    0x607 : 0x67B7,
-    0x608 : None,
-    0x701 : None,
-}
-
-
-
 parser = argparse.ArgumentParser(
     description = "ActRaiser Randomizer for Professional Mode"
 )
@@ -75,6 +28,11 @@ parser.add_argument(
     action = "store_true",
     help = "execute without saving any changes"
 )
+parser.add_argument(
+    "-B", "--boss-rush-last",
+    action = "store_true",
+    help = "keep the boss rush at the end"
+)
 forcePathGroup = parser.add_mutually_exclusive_group()
 forcePathGroup.add_argument(
     "-L", "--left-path",
@@ -89,6 +47,11 @@ forcePathGroup.add_argument(
     const = "right",
     dest = "force_path",
     help = "use the right path in Marahna II"
+)
+parser.add_argument(
+    "-T", "--tanzra-last",
+    action = "store_true",
+    help = "fight Tanzra last in the boss rush"
 )
 # This option should be named "input-file". It isn't because of a bug with
 # dash-to-underscore replacement for positional arguments:
@@ -107,12 +70,23 @@ parser.add_argument(
     type = str,
     help = "output file name"
 )
+
 args = parser.parse_args()
-
-
 
 if args.input_file is None and not args.dry_run:
     parser.error("Argument 'input-file' is required when not in dry-run mode")
+
+randomizerFlags = ""
+if args.boss_rush_last:
+    randomizerFlags += "B"
+if args.force_path == "left":
+    randomizerFlags += "L"
+elif args.force_path == "right":
+    randomizerFlags += "R"
+if args.tanzra_last:
+    randomizerFlags += "T"
+
+
 
 rng = random.Random()
 seed = args.seed
@@ -121,22 +95,16 @@ if seed is None:
 seed %= 2**32
 
 print("RNG seed: {}".format(seed))
+print("Randomizer flags: {}".format((randomizerFlags if randomizerFlags else "-")))
 rng.seed(seed)
 
 # Always do the coin flip, even if we're going to override the result.
 # This way, the shuffled map order for a given seed will stay the same, even
 # if the chosen force-path option (left, right or unspecified) changes.
 marahnaCoinFlip = rng.choice(["left", "right"])
-if args.force_path:
-    if args.verbose:
-        print("Marahna II path: {}".format(marahnaCoinFlip))
-    marahnaPath = args.force_path
-    print("Marahna II path: {} (forced by command-line option)".format(marahnaPath))
-else:
-    marahnaPath = marahnaCoinFlip
-    if args.verbose:
-        print("Marahna II path: {}".format(marahnaPath))
+marahnaPath = (args.force_path if args.force_path else marahnaCoinFlip)
 
+# Shuffle the maps.
 mapNumbers = [
     0x101,
     0x102, 0x103, 0x104,
@@ -150,24 +118,34 @@ mapNumbers = [
     0x504, 0x505, (0x506 if marahnaPath == "left" else 0x507), 0x508,
     0x601, 0x602, 0x603, 0x604,
     0x605, 0x606, 0x607, 0x608,
-    0x701,
 ]
 rng.shuffle(mapNumbers)
-mapNumbers.append(0x801)
+bossRushIndex = rng.randint(0, len(mapNumbers))
+if args.boss_rush_last:
+    bossRushIndex = len(mapNumbers)
+mapNumbers.insert(bossRushIndex, 0x701)
 
-bossRush = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707, 0x708,]
+# Shuffle the boss rush.
+bossRush = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707,]
 rng.shuffle(bossRush)
+tanzraIndex = rng.randint(0, len(bossRush))
+if args.tanzra_last:
+    tanzraIndex = len(bossRush)
+bossRush.insert(tanzraIndex, 0x708)
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
-    spoilerLog = mapNumbers[:-1]
-    bossRushIndex = spoilerLog.index(0x701)
+    print("Marahna II path: {}".format(marahnaPath))
+    spoilerLog = list(mapNumbers)
     spoilerLog[bossRushIndex:bossRushIndex] = bossRush
     for i, mapNumber in enumerate(spoilerLog, 1):
         print("{:3X} ".format(mapNumber), end="")
         if i % 10 == 0:
             print()
     print()
+
+# Add the end credits as the last map.
+mapNumbers.append(0x801)
 
 if not args.dry_run:
     # Read the input file.
@@ -199,10 +177,8 @@ if not args.dry_run:
     # repurpose the space used by the "CONTINUE" / "NEW GAME" option text.
     struct.pack_into("<H", romBytes, 0x12715, 0xA9A7)
     menuString = "> START < {}".format(seed)
-    if args.force_path == "left":
-        menuString += "-L"
-    elif args.force_path == "right":
-        menuString += "-R"
+    if randomizerFlags:
+        menuString += "-{}".format(randomizerFlags)
     menuBytes = menuString.center(32).encode("ascii")
     struct.pack_into("{}s".format(len(menuBytes) + 1), romBytes, 0x129A7, menuBytes)
 
@@ -338,6 +314,52 @@ if not args.dry_run:
     for offset in range(0x1093E + 0x18, 0x10E7E, 0x1C):
         romBytes[offset] &= 0x7F
 
+    # Prepare to update the "next map" values.
+    nextMapOffsets = {
+        0x101 : None,
+        0x102 : 0x3031,
+        0x103 : 0x303C,
+        0x104 : None,
+        0x201 : None,
+        0x202 : 0x392C,
+        0x203 : 0x393A,
+        0x204 : 0x3948,
+        0x205 : 0x3956,
+        0x206 : 0x3964,
+        0x207 : 0x3972,
+        0x208 : None,
+        0x301 : 0x415F,
+        0x302 : None,
+        0x303 : 0x416D,
+        0x304 : 0x4187,
+        0x305 : 0x419D,
+        0x306 : None,
+        0x401 : 0x4DEC,
+        0x402 : 0x4DFA,
+        0x403 : None,
+        0x404 : 0x4E10,
+        0x405 : 0x4E1E,
+        0x406 : 0x4E34,
+        0x407 : None,
+        0x501 : 0x66C7,
+        0x502 : 0x66D5,
+        0x503 : None,
+        0x504 : 0x66EB,
+        0x505 : 0x66F9,
+        0x506 : 0x671D,
+        0x507 : 0x671D,
+        0x508 : None,
+        0x601 : 0x6767,
+        0x602 : 0x6775,
+        0x603 : 0x678B,
+        0x604 : None,
+        0x605 : 0x67A1,
+        0x606 : 0x67AC,
+        0x607 : 0x67B7,
+        0x608 : None,
+        0x701 : None,
+    }
+
     # Specify which map to load first.
     # The map number at 0x11013 seems to be ignored in favour of 0x12B1C, but
     # the following map numbers (0x11015 onward) do get used, so I'm updating
@@ -346,13 +368,13 @@ if not args.dry_run:
     struct.pack_into(">H", romBytes, 0x11013, mapNumbers[0])
     professionalModeOffset = 0x11015
 
-    # Update the exit destinations.
+    # Update the "next map" values.
     for i in range(len(mapNumbers) - 1):
         mapNumber = mapNumbers[i]
         nextMapNumber = mapNumbers[i+1]
 
-        if exits[mapNumber]:
-            struct.pack_into("<H", romBytes, exits[mapNumber], nextMapNumber)
+        if nextMapOffsets[mapNumber]:
+            struct.pack_into("<H", romBytes, nextMapOffsets[mapNumber], nextMapNumber)
         else:
             struct.pack_into(">H", romBytes, professionalModeOffset, nextMapNumber)
             professionalModeOffset += 2
@@ -448,10 +470,8 @@ if not args.dry_run:
     outFileName = args.output_file
     if outFileName is None:
         suffix = "_{}".format(seed)
-        if args.force_path == "left":
-            suffix += "_L"
-        elif args.force_path == "right":
-            suffix += "_R"
+        if randomizerFlags:
+            suffix += "_{}".format(randomizerFlags)
 
         basename, dot, extension = inFileName.rpartition(".")
         if basename and extension:
