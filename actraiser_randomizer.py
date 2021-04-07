@@ -5,33 +5,51 @@
 # 2019-10-19
 
 import argparse
+import hashlib
 import random
 import struct
+import textwrap
 
 
 
 parser = argparse.ArgumentParser(
-    description = "ActRaiser Randomizer for Professional Mode"
+    description = "ActRaiser Randomizer for Professional Mode",
+    formatter_class = argparse.RawTextHelpFormatter,
 )
 parser.add_argument(
     "-s", "--seed",
     type = int,
-    help = "specify the RNG seed value"
+    help = "specify the RNG seed value",
+)
+parser.add_argument(
+    "-m", "--mask-seed",
+    action = "store_true",
+    help = "mask the seed to prevent cheating",
 )
 parser.add_argument(
     "-v", "--verbose",
     action = "count",
-    help = "print spoiler log"
+    help = "print spoiler log",
 )
 parser.add_argument(
     "-n", "--dry-run",
     action = "store_true",
-    help = "execute without saving any changes"
+    help = "execute without saving any changes",
 )
-parser.add_argument(
-    "-B", "--boss-rush-last",
-    action = "store_true",
-    help = "keep the boss rush at the end"
+initialLivesGroup = parser.add_mutually_exclusive_group()
+initialLivesGroup.add_argument(
+    "-E", "--extra-lives",
+    action = "store_const",
+    const = "extra",
+    dest = "initial_lives",
+    help = "start with 10 lives instead of 5",
+)
+initialLivesGroup.add_argument(
+    "-U", "--unlimited-lives",
+    action = "store_const",
+    const = "unlimited",
+    dest = "initial_lives",
+    help = "play with unlimited lives",
 )
 forcePathGroup = parser.add_mutually_exclusive_group()
 forcePathGroup.add_argument(
@@ -39,19 +57,34 @@ forcePathGroup.add_argument(
     action = "store_const",
     const = "left",
     dest = "force_path",
-    help = "use the left path in Marahna II"
+    help = "use the left path in Marahna II",
 )
 forcePathGroup.add_argument(
     "-R", "--right-path",
     action = "store_const",
     const = "right",
     dest = "force_path",
-    help = "use the right path in Marahna II"
+    help = "use the right path in Marahna II",
 )
 parser.add_argument(
-    "-T", "--tanzra-last",
-    action = "store_true",
-    help = "fight Tanzra last in the boss rush"
+    "-P", "--boss-rush-position",
+    choices = ["vanilla", "random", "scattered"],
+    help = textwrap.dedent("""\
+        specify boss rush position
+        position options: %(choices)s
+        if omitted, default to 'random' or 'scattered'"""
+    ),
+    metavar = "POSITION",
+)
+parser.add_argument(
+    "-O", "--boss-rush-order",
+    choices = ["vanilla", "random", "tanzralast"],
+    help = textwrap.dedent("""\
+        specify boss rush order
+        order options: %(choices)s
+        if omitted, default to 'random'"""
+    ),
+    metavar = "ORDER",
 )
 # This option should be named "input-file". It isn't because of a bug with
 # dash-to-underscore replacement for positional arguments:
@@ -70,21 +103,36 @@ parser.add_argument(
     type = str,
     help = "output file name"
 )
-
 args = parser.parse_args()
 
 if args.input_file is None and not args.dry_run:
     parser.error("Argument 'input-file' is required when not in dry-run mode")
 
 randomizerFlags = ""
-if args.boss_rush_last:
-    randomizerFlags += "B"
+
+if args.initial_lives == "extra":
+    randomizerFlags += "E"
+elif args.initial_lives == "unlimited":
+    randomizerFlags += "U"
+
 if args.force_path == "left":
     randomizerFlags += "L"
 elif args.force_path == "right":
     randomizerFlags += "R"
-if args.tanzra_last:
-    randomizerFlags += "T"
+
+if args.boss_rush_position == "vanilla":
+    randomizerFlags += "Pv"
+elif args.boss_rush_position == "random":
+    randomizerFlags += "Pr"
+elif args.boss_rush_position == "scattered":
+    randomizerFlags += "Ps"
+
+if args.boss_rush_order == "vanilla":
+    randomizerFlags += "Ov"
+elif args.boss_rush_order == "random":
+    randomizerFlags += "Or"
+elif args.boss_rush_order == "tanzralast":
+    randomizerFlags += "Ot"
 
 
 
@@ -93,8 +141,14 @@ seed = args.seed
 if seed is None:
     seed = random.SystemRandom().getrandbits(32)
 seed %= 2**32
+maskedSeed = hashlib.md5(str(seed).encode()).hexdigest().upper()[:8]
 
-print("RNG seed: {}".format(seed))
+if args.mask_seed:
+    print("RNG seed (masked): {}".format(maskedSeed))
+    if args.verbose:
+        print("RNG seed (unmasked): {}".format(seed))
+else:
+    print("RNG seed: {}".format(seed))
 print("Randomizer flags: {}".format((randomizerFlags if randomizerFlags else "-")))
 rng.seed(seed)
 
@@ -103,8 +157,12 @@ rng.seed(seed)
 # if the chosen force-path option (left, right or unspecified) changes.
 marahnaCoinFlip = rng.choice(["left", "right"])
 marahnaPath = (args.force_path if args.force_path else marahnaCoinFlip)
+bossRushPositionCoinFlip = rng.choice(["random", "scattered"])
+bossRushPosition = (args.boss_rush_position if args.boss_rush_position else bossRushPositionCoinFlip)
+bossRushOrder = (args.boss_rush_order if args.boss_rush_order else "random")
 
 # Shuffle the maps.
+BOSS_RUSH_PLACEHOLDER = 0x700
 mapNumbers = [
     0x101,
     0x102, 0x103, 0x104,
@@ -118,27 +176,45 @@ mapNumbers = [
     0x504, 0x505, (0x506 if marahnaPath == "left" else 0x507), 0x508,
     0x601, 0x602, 0x603, 0x604,
     0x605, 0x606, 0x607, 0x608,
+    *([BOSS_RUSH_PLACEHOLDER] * 8),
 ]
 rng.shuffle(mapNumbers)
-bossRushIndex = rng.randint(0, len(mapNumbers))
-if args.boss_rush_last:
-    bossRushIndex = len(mapNumbers)
-mapNumbers.insert(bossRushIndex, 0x701)
+# The boss rush placeholders are only needed when the boss rush is scattered.
+if bossRushPosition != "scattered":
+    mapNumbers = [i for i in mapNumbers if i != BOSS_RUSH_PLACEHOLDER]
 
 # Shuffle the boss rush.
-bossRush = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707,]
+bossRushVanilla = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707,]
+bossRush = bossRushVanilla.copy()
 rng.shuffle(bossRush)
+if bossRushOrder == "vanilla":
+    bossRush = bossRushVanilla
 tanzraIndex = rng.randint(0, len(bossRush))
-if args.tanzra_last:
+if bossRushOrder in ["vanilla", "tanzralast"]:
     tanzraIndex = len(bossRush)
 bossRush.insert(tanzraIndex, 0x708)
+
+# Combine the shuffled maps and boss rush.
+bossRushIndex = rng.randint(0, len(mapNumbers))
+if bossRushPosition == "vanilla":
+    bossRushIndex = len(mapNumbers)
+
+if bossRushPosition in ["vanilla", "random"]:
+    mapNumbers.insert(bossRushIndex, 0x701)
+    mapNumbers[bossRushIndex:bossRushIndex] = bossRush
+elif bossRushPosition == "scattered":
+    for boss in bossRush:
+        placeholderIndex = mapNumbers.index(BOSS_RUSH_PLACEHOLDER)
+        mapNumbers[placeholderIndex] = boss
+    placeholderIndex = mapNumbers.index(BOSS_RUSH_PLACEHOLDER)
+    mapNumbers[placeholderIndex] = 0x701
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
     print("Marahna II path: {}".format(marahnaPath))
-    spoilerLog = list(mapNumbers)
-    spoilerLog[bossRushIndex:bossRushIndex] = bossRush
-    for i, mapNumber in enumerate(spoilerLog, 1):
+    print("Boss rush position: {}".format(bossRushPosition))
+    print("Boss rush order: {}".format(bossRushOrder))
+    for i, mapNumber in enumerate(mapNumbers, 1):
         print("{:3X} ".format(mapNumber), end="")
         if i % 10 == 0:
             print()
@@ -146,6 +222,8 @@ if args.verbose:
 
 # Add the end credits as the last map.
 mapNumbers.append(0x801)
+
+
 
 if not args.dry_run:
     # Read the input file.
@@ -169,27 +247,30 @@ if not args.dry_run:
     romBytes[0x13E29] = 0x1F
 
     # Make the initial menu only have "START" as an option.
-    romBytes[0x1270D] = 0xEA
-    romBytes[0x1270E] = 0xEA
+    romBytes[0x1270D] = 0xEA # NOP
+    romBytes[0x1270E] = 0xEA # NOP
     # Print the menu option starting at the left side of the screen.
     romBytes[0x12712] = 0x00
     # We need more space than the "START" option text provides, so we'll
     # repurpose the space used by the "CONTINUE" / "NEW GAME" option text.
     struct.pack_into("<H", romBytes, 0x12715, 0xA9A7)
-    menuString = "> START < {}".format(seed)
+    if args.mask_seed:
+        menuString = "> *{}+".format(maskedSeed)
+    else:
+        menuString = "> {}".format(seed)
     if randomizerFlags:
         menuString += "-{}".format(randomizerFlags)
     menuBytes = menuString.center(32).encode("ascii")
     struct.pack_into("{}s".format(len(menuBytes) + 1), romBytes, 0x129A7, menuBytes)
 
     # Always enter Professional Mode from the initial menu.
-    romBytes[0x40] = 0xEA
-    romBytes[0x41] = 0xEA
+    romBytes[0x40] = 0xEA # NOP
+    romBytes[0x41] = 0xEA # NOP
 
     # In the event of player death, respawn on the same map.
-    romBytes[0x13D61] = 0xEA
-    romBytes[0x13D62] = 0xEA
-    romBytes[0x13D63] = 0xA5
+    romBytes[0x13D61] = 0xEA # NOP
+    romBytes[0x13D62] = 0xEA # NOP
+    romBytes[0x13D63] = 0xA5 # LDA $19
     romBytes[0x13D64] = 0x19
 
     # Add a room counter to the HUD.
@@ -239,6 +320,22 @@ if not args.dry_run:
     struct.pack_into("<H", romBytes, 0x10E84, 0x0030)
     struct.pack_into("<H", romBytes, 0x10E86, 0x0030)
     struct.pack_into("<H", romBytes, 0x10E88, 0x0000)
+
+    # Handle the "extra lives" and "unlimited lives" cases.
+    if args.initial_lives == "extra":
+        # The value in memory is BCD and one less than the displayed value.
+        # e.g. 0x09 --> 9 decimal --> 10 lives shown on the HUD
+        romBytes[0x12B14] = 0x09
+    elif args.initial_lives == "unlimited":
+        # Update the HUD to always show 99 lives remaining.
+        romBytes[0x1428E] = 0xA9 # LDA #$39
+        romBytes[0x1428F] = 0x39
+        romBytes[0x1429E] = 0xA9 # LDA #$39
+        romBytes[0x1429F] = 0x39
+        # Upon death, don't reduce the number of lives remaining.
+        romBytes[0x2B0] = 0xEA # NOP
+        romBytes[0x2B1] = 0xEA # NOP
+        romBytes[0x2B2] = 0xEA # NOP
 
     # Update the HUD's fixed content to not show ten MP scrolls.
     # For some reason, the fixed content has the variable fields filled in
@@ -304,10 +401,10 @@ if not args.dry_run:
 
     # Skip the "descending ball of light brings statue to life" animation.
     # On some maps, it causes the player to take unavoidable damage.
-    romBytes[0x12B0D] = 0x9C
+    romBytes[0x12B0D] = 0x9C # STZ (replacing STA)
 
     # Make both exits from Marahna II.b go to the same destination map.
-    romBytes[0x6702] = 0xEA
+    romBytes[0x6702] = 0xEA # NOP
 
     # Prevent animated tiles from glitching.
     # Not sure exactly why the glitching occurs, but this change fixes it.
@@ -359,6 +456,8 @@ if not args.dry_run:
         0x608 : None,
         0x701 : None,
     }
+    for i, boss in enumerate(bossRush):
+        nextMapOffsets[boss] = 0x7F90 + (i*2)
 
     # Specify which map to load first.
     # The map number at 0x11013 seems to be ignored in favour of 0x12B1C, but
@@ -372,6 +471,17 @@ if not args.dry_run:
     for i in range(len(mapNumbers) - 1):
         mapNumber = mapNumbers[i]
         nextMapNumber = mapNumbers[i+1]
+        # Go through the Death Heim hub room to reach the boss rush rooms.
+        if nextMapNumber & 0xFF00 == 0x700:
+            nextMapNumber = 0x701
+
+        # Something I never noticed before: after defeating Tanzra, when you
+        # return to the Death Heim hub room, Tanzra's theme keeps playing.
+        # This is fine when returning to the hub room, but feels like a bug
+        # or oversight when the following room is anything else.
+        # So let's fix that.
+        if mapNumber == 0x708 and nextMapNumber != 0x701:
+            romBytes[0x7F00] = 0x80 # BRA (replacing BNE)
 
         if nextMapOffsets[mapNumber]:
             struct.pack_into("<H", romBytes, nextMapOffsets[mapNumber], nextMapNumber)
@@ -380,18 +490,41 @@ if not args.dry_run:
             professionalModeOffset += 2
 
     # Update the boss rush.
-    # After defeating a boss, take away the sword upgrade (so you don't keep
-    # it after fighting Tanzra), and advance the boss rush counter by adding
-    # one (instead of setting it based on the boss room's map number).
-    romBytes[0x7EEC] = 0xE2 # SEP #$20
-    romBytes[0x7EED] = 0x20
-    romBytes[0x7EEE] = 0x64 # STZ $E4
-    romBytes[0x7EEF] = 0xE4
-    romBytes[0x7EF0] = 0xC2 # REP #$20
-    romBytes[0x7EF1] = 0x20
-    romBytes[0x7EF2] = 0xEE # INC $0347
-    romBytes[0x7EF3] = 0x47
-    romBytes[0x7EF4] = 0x03
+    # Get the "next map" value after defeating a boss.
+    romBytes[0x7EEC] = 0xDA # PHX
+    romBytes[0x7EED] = 0xAD # LDA $0347
+    romBytes[0x7EEE] = 0x47
+    romBytes[0x7EEF] = 0x03
+    romBytes[0x7EF0] = 0x0A # ASL
+    romBytes[0x7EF1] = 0xAA # TAX
+    romBytes[0x7EF2] = 0xBD # LDA $FF90,X
+    romBytes[0x7EF3] = 0x90
+    romBytes[0x7EF4] = 0xFF
+    romBytes[0x7EF5] = 0xFA # PLX
+    # There's not enough space in the "just defeated a boss-rush boss" code
+    # for everything we need to do, so let's put in a subroutine call to some
+    # unused space...
+    romBytes[0x7EF6] = 0x22 # JSL $00FFA0
+    romBytes[0x7EF7] = 0xA0
+    romBytes[0x7EF8] = 0xFF
+    romBytes[0x7EF9] = 0x00
+    # ...and write the new code into that unused space.
+    # Use the "next map" value.
+    romBytes[0x7FA0] = 0x85 # STA $1A
+    romBytes[0x7FA1] = 0x1A
+    # Advance the boss rush counter.
+    romBytes[0x7FA2] = 0xEE # INC $0347
+    romBytes[0x7FA3] = 0x47
+    romBytes[0x7FA4] = 0x03
+    # Take away the sword upgrade, so you don't keep it after fighting Tanzra.
+    romBytes[0x7FA5] = 0xE2 # SEP #$20
+    romBytes[0x7FA6] = 0x20
+    romBytes[0x7FA7] = 0x64 # STZ $E4
+    romBytes[0x7FA8] = 0xE4
+    romBytes[0x7FA9] = 0xC2 # REP #$20
+    romBytes[0x7FAA] = 0x20
+    # Return.
+    romBytes[0x7FAB] = 0x6B # RTL
 
     # Write the new boss rush order to some unused space.
     for i, boss in enumerate(bossRush):
@@ -457,11 +590,11 @@ if not args.dry_run:
     # Change the conditions that break the loop.
     # Wait until after we've dimmed the eyes and shattered the gem of the
     # current face to try breaking the loop.
-    romBytes[0x7558] = 0xEA
-    romBytes[0x7559] = 0xEA
-    romBytes[0x755A] = 0xEA
-    romBytes[0x755B] = 0xEA
-    romBytes[0x755C] = 0xEA
+    romBytes[0x7558] = 0xEA # NOP
+    romBytes[0x7559] = 0xEA # NOP
+    romBytes[0x755A] = 0xEA # NOP
+    romBytes[0x755B] = 0xEA # NOP
+    romBytes[0x755C] = 0xEA # NOP
     # Break the loop if all of the bosses have been defeated.
     romBytes[0x7581] = 0x07
     romBytes[0x7584] = 0x24
@@ -469,7 +602,10 @@ if not args.dry_run:
     # Write the output file.
     outFileName = args.output_file
     if outFileName is None:
-        suffix = "_{}".format(seed)
+        if args.mask_seed:
+            suffix = "_x{}x".format(maskedSeed)
+        else:
+            suffix = "_{}".format(seed)
         if randomizerFlags:
             suffix += "_{}".format(randomizerFlags)
 
