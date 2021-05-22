@@ -599,6 +599,15 @@ if not args.dry_run:
     romBytes[0x7581] = 0x07
     romBytes[0x7584] = 0x24
 
+    # Fix the "credits shown instead of Game Over" bug.
+    # Map 0x801 is used for both, so if you ran out of lives after defeating
+    # all of the end-of-Act bosses and clearing Death Heim, the game would
+    # assume you'd won and roll the credits.
+    romBytes[0x12AA7] = 0xA5 # LDA $21
+    romBytes[0x12AA8] = 0x21
+    romBytes[0x12AA9] = 0xC9 # CMP #$49
+    romBytes[0x12AAA] = 0x49
+
     # Write the output file.
     outFileName = args.output_file
     if outFileName is None:
