@@ -460,11 +460,15 @@ if not args.dry_run:
         nextMapOffsets[boss] = 0x7F90 + (i*2)
 
     # Specify which map to load first.
+    firstMapNumber = mapNumbers[0]
+    # If the first map is a boss rush room, start in the Death Heim hub room.
+    if firstMapNumber & 0xFF00 == 0x700:
+        firstMapNumber = 0x701
+    struct.pack_into("<H", romBytes, 0x12B1C, firstMapNumber)
     # The map number at 0x11013 seems to be ignored in favour of 0x12B1C, but
     # the following map numbers (0x11015 onward) do get used, so I'm updating
     # 0x11013 as well for consistency.
-    struct.pack_into("<H", romBytes, 0x12B1C, mapNumbers[0])
-    struct.pack_into(">H", romBytes, 0x11013, mapNumbers[0])
+    struct.pack_into(">H", romBytes, 0x11013, firstMapNumber)
     professionalModeOffset = 0x11015
 
     # Update the "next map" values.
