@@ -51,40 +51,41 @@ initialLivesGroup.add_argument(
     dest = "initial_lives",
     help = "play with unlimited lives",
 )
-forcePathGroup = parser.add_mutually_exclusive_group()
-forcePathGroup.add_argument(
+marahnaPathGroup = parser.add_mutually_exclusive_group()
+marahnaPathGroup.add_argument(
     "-L", "--left-path",
     action = "store_const",
     const = "left",
-    dest = "force_path",
+    dest = "marahna_path",
     help = "use the left path in Marahna II",
 )
-forcePathGroup.add_argument(
+marahnaPathGroup.add_argument(
     "-R", "--right-path",
     action = "store_const",
     const = "right",
-    dest = "force_path",
+    dest = "marahna_path",
     help = "use the right path in Marahna II",
 )
-parser.add_argument(
-    "-P", "--boss-rush-position",
-    choices = ["vanilla", "random", "scattered"],
+bossRushTypeGroup = parser.add_mutually_exclusive_group()
+bossRushTypeGroup.add_argument(
+    "-C", "--consecutive-boss-rush",
+    action = "store_const",
+    const = "consecutive",
+    dest = "boss_rush_type",
     help = textwrap.dedent("""\
-        specify boss rush position
-        position options: %(choices)s
-        if omitted, default to 'random' or 'scattered'"""
+        fight all seven boss-rush bosses back-to-back, in
+        random order, at a random location in the shuffle"""
     ),
-    metavar = "POSITION",
 )
-parser.add_argument(
-    "-O", "--boss-rush-order",
-    choices = ["vanilla", "random", "tanzralast"],
+bossRushTypeGroup.add_argument(
+    "-S", "--scattered-boss-rush",
+    action = "store_const",
+    const = "scattered",
+    dest = "boss_rush_type",
     help = textwrap.dedent("""\
-        specify boss rush order
-        order options: %(choices)s
-        if omitted, default to 'random'"""
+        split the boss rush into individual boss battles,
+        scattered randomly among the other shuffled rooms"""
     ),
-    metavar = "ORDER",
 )
 # This option should be named "input-file". It isn't because of a bug with
 # dash-to-underscore replacement for positional arguments:
@@ -115,24 +116,15 @@ if args.initial_lives == "extra":
 elif args.initial_lives == "unlimited":
     randomizerFlags += "U"
 
-if args.force_path == "left":
+if args.marahna_path == "left":
     randomizerFlags += "L"
-elif args.force_path == "right":
+elif args.marahna_path == "right":
     randomizerFlags += "R"
 
-if args.boss_rush_position == "vanilla":
-    randomizerFlags += "Pv"
-elif args.boss_rush_position == "random":
-    randomizerFlags += "Pr"
-elif args.boss_rush_position == "scattered":
-    randomizerFlags += "Ps"
-
-if args.boss_rush_order == "vanilla":
-    randomizerFlags += "Ov"
-elif args.boss_rush_order == "random":
-    randomizerFlags += "Or"
-elif args.boss_rush_order == "tanzralast":
-    randomizerFlags += "Ot"
+if args.boss_rush_type == "consecutive":
+    randomizerFlags += "C"
+elif args.boss_rush_type == "scattered":
+    randomizerFlags += "S"
 
 
 
@@ -154,12 +146,11 @@ rng.seed(seed)
 
 # Always do the coin flip, even if we're going to override the result.
 # This way, the shuffled map order for a given seed will stay the same, even
-# if the chosen force-path option (left, right or unspecified) changes.
+# if the chosen Marahna-path option (left, right or unspecified) changes.
 marahnaCoinFlip = rng.choice(["left", "right"])
-marahnaPath = (args.force_path if args.force_path else marahnaCoinFlip)
-bossRushPositionCoinFlip = rng.choice(["random", "scattered"])
-bossRushPosition = (args.boss_rush_position if args.boss_rush_position else bossRushPositionCoinFlip)
-bossRushOrder = (args.boss_rush_order if args.boss_rush_order else "random")
+marahnaPath = (args.marahna_path if args.marahna_path else marahnaCoinFlip)
+bossRushTypeCoinFlip = rng.choice(["consecutive", "scattered"])
+bossRushType = (args.boss_rush_type if args.boss_rush_type else bossRushTypeCoinFlip)
 
 # Shuffle the maps.
 BOSS_RUSH_PLACEHOLDER = 0x700
@@ -180,40 +171,33 @@ mapNumbers = [
 ]
 rng.shuffle(mapNumbers)
 # The boss rush placeholders are only needed when the boss rush is scattered.
-if bossRushPosition != "scattered":
+if bossRushType != "scattered":
     mapNumbers = [i for i in mapNumbers if i != BOSS_RUSH_PLACEHOLDER]
 
 # Shuffle the boss rush.
-bossRushVanilla = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707,]
-bossRush = bossRushVanilla.copy()
+bossRush = [0x702, 0x703, 0x704, 0x705, 0x706, 0x707, 0x708]
 rng.shuffle(bossRush)
-if bossRushOrder == "vanilla":
-    bossRush = bossRushVanilla
-tanzraIndex = rng.randint(0, len(bossRush))
-if bossRushOrder in ["vanilla", "tanzralast"]:
-    tanzraIndex = len(bossRush)
-bossRush.insert(tanzraIndex, 0x708)
 
 # Combine the shuffled maps and boss rush.
 bossRushIndex = rng.randint(0, len(mapNumbers))
-if bossRushPosition == "vanilla":
-    bossRushIndex = len(mapNumbers)
-
-if bossRushPosition in ["vanilla", "random"]:
+if bossRushType == "consecutive":
     mapNumbers.insert(bossRushIndex, 0x701)
     mapNumbers[bossRushIndex:bossRushIndex] = bossRush
-elif bossRushPosition == "scattered":
+elif bossRushType == "scattered":
+    # Replace the first seven placeholders with boss rooms.
     for boss in bossRush:
         placeholderIndex = mapNumbers.index(BOSS_RUSH_PLACEHOLDER)
         mapNumbers[placeholderIndex] = boss
+    # Replace the last placeholder with the Death Heim hub room.
+    # Since all of the boss-rush bosses have been defeated before getting
+    # here, this results in Death Heim Clear.
     placeholderIndex = mapNumbers.index(BOSS_RUSH_PLACEHOLDER)
     mapNumbers[placeholderIndex] = 0x701
 
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
     print("Marahna II path: {}".format(marahnaPath))
-    print("Boss rush position: {}".format(bossRushPosition))
-    print("Boss rush order: {}".format(bossRushOrder))
+    print("Boss rush type: {}".format(bossRushType))
     for i, mapNumber in enumerate(mapNumbers, 1):
         print("{:3X} ".format(mapNumber), end="")
         if i % 10 == 0:
@@ -407,7 +391,6 @@ if not args.dry_run:
     romBytes[0x6702] = 0xEA # NOP
 
     # Prevent animated tiles from glitching.
-    # Not sure exactly why the glitching occurs, but this change fixes it.
     for offset in range(0x1093E + 0x18, 0x10E7E, 0x1C):
         romBytes[offset] &= 0x7F
 

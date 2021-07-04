@@ -19,9 +19,10 @@ Randomizer for ActRaiser's Professional Mode
         [Mac](https://www.romhacking.net/utilities/484/), [Linux](https://www.romhacking.net/utilities/401/)).
    * The ROM should have the following checksums:
      ```
-     CRC32: EAC3358D
-       MD5: 635D5D7DD2AAD4768412FBAE4A32FD6E
-     SHA-1: E8365852CC20178D42C93CD188A7AE9AF45369D7
+       CRC32: EAC3358D
+         MD5: 635D5D7DD2AAD4768412FBAE4A32FD6E
+       SHA-1: E8365852CC20178D42C93CD188A7AE9AF45369D7
+     SHA-256: B8055844825653210D252D29A2229F9A3E7E512004E83940620173C57D8723F0
      ```
 
 ## Usage
@@ -59,12 +60,11 @@ Randomizer for ActRaiser's Professional Mode
      RNG seed: 3816547290
      Randomizer flags: -
      Marahna II path: right
-     Boss rush position: scattered
-     Boss rush order: random
+     Boss rush type: scattered
      406 204 208 301 202 502 504 704 702 102
-     608 402 206 603 503 205 707 104 103 306
-     304 401 207 601 705 303 101 407 706 508
-     505 607 605 606 708 203 405 403 604 501
+     608 402 206 603 503 205 708 104 103 306
+     304 401 207 601 705 303 101 407 707 508
+     505 607 605 606 706 203 405 403 604 501
      703 305 302 404 201 701 507 602
      ```
 * To perform a dry-run (do all the randomization, but don't generate a new ROM), use `-n`
@@ -73,18 +73,7 @@ Randomizer for ActRaiser's Professional Mode
 * To start with 10 lives instead of 5, use `-E`
 * To play with unlimited lives, use `-U`
 * To force a particular path in Marahna II, use `-L` (left) or `-R` (right)
-* To change the position of the boss rush, use `-P POSITION`
-   * `POSITION` can be any one of the following:
-      * `vanilla`: The boss rush is consecutive and happens at the end
-      * `random`: The boss rush is consecutive and happens at a random location
-      * `scattered`: The boss rush is split into individual boss fights and scattered among the other rooms
-   * If this option is omitted, the position will be either `random` or `scattered`, based on the seed.
-* To change the order of the boss rush, use `-O ORDER`
-   * `ORDER` can be any one of the following:
-      * `vanilla`: Minotaurus, Zeppelin Wolf, Pharaoh, Fire Wheel, Kalia, Arctic Wyvern, Tanzra
-      * `random`: The seven bosses will be fought in a random order
-      * `tanzralast`: The first six bosses will be fought in a random order, with Tanzra last
-   * If this option is omitted, the order will be `random`.
+* To force a boss rush type, use `-C` (consecutive) or `-S` (scattered)
 * To specify the generated ROM's file name, use `-o OUTPUT_FILE_NAME`
 
 ## Gameplay
