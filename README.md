@@ -72,6 +72,7 @@ Randomizer for ActRaiser's Professional Mode
    * In dry-run mode, the ROM file name is optional and can be omitted.
 * To start with 10 lives instead of 5, use `-E`
 * To play with unlimited lives, use `-U`
+* To play with a permanent sword upgrade, use `-Z`
 * To force a particular path in Marahna II, use `-L` (left) or `-R` (right)
 * To force a boss rush type, use `-C` (consecutive) or `-S` (scattered)
 * To specify the generated ROM's file name, use `-o OUTPUT_FILE_NAME`

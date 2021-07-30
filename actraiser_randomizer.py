@@ -51,6 +51,11 @@ initialLivesGroup.add_argument(
     dest = "initial_lives",
     help = "play with unlimited lives",
 )
+parser.add_argument(
+    "-Z", "--zantetsuken",
+    action = "store_true",
+    help = "play with a permanent sword upgrade",
+)
 marahnaPathGroup = parser.add_mutually_exclusive_group()
 marahnaPathGroup.add_argument(
     "-L", "--left-path",
@@ -115,6 +120,9 @@ if args.initial_lives == "extra":
     randomizerFlags += "E"
 elif args.initial_lives == "unlimited":
     randomizerFlags += "U"
+
+if args.zantetsuken:
+    randomizerFlags += "Z"
 
 if args.marahna_path == "left":
     randomizerFlags += "L"
@@ -386,6 +394,14 @@ if not args.dry_run:
     # Skip the "descending ball of light brings statue to life" animation.
     # On some maps, it causes the player to take unavoidable damage.
     romBytes[0x12B0D] = 0x9C # STZ (replacing STA)
+
+    # Handle the "permanent sword upgrade" case.
+    if args.zantetsuken:
+        # Check-if-sword-upgraded helper function: Sword is always upgraded
+        romBytes[0x8CE] = 0xEA # NOP
+        romBytes[0x8CF] = 0xEA # NOP
+        # Sword attack power: Always 2
+        romBytes[0x1DD9] = 0x80 # BRA (replacing BNE)
 
     # Make both exits from Marahna II.b go to the same destination map.
     romBytes[0x6702] = 0xEA # NOP
