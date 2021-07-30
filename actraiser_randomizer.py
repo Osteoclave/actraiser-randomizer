@@ -12,8 +12,18 @@ import textwrap
 
 
 
+# Randomizer version: The current version's release date in YYYY-MM-DD format.
+# Update this with each new release.
+# Add a suffix (e.g. "/b", "/c") if there's more than one release in a day.
+# Title screen space is limited, so don't use more than 15 characters.
+randomizerVersion = "2021-07-30"
+
+# Process the command line arguments.
 parser = argparse.ArgumentParser(
-    description = "ActRaiser Randomizer for Professional Mode",
+    description = textwrap.dedent("""\
+        ActRaiser Randomizer for Professional Mode
+        (version: {})""".format(randomizerVersion)
+    ),
     formatter_class = argparse.RawTextHelpFormatter,
 )
 parser.add_argument(
@@ -136,20 +146,12 @@ elif args.boss_rush_type == "scattered":
 
 
 
+# Seed the random number generator.
 rng = random.Random()
 seed = args.seed
 if seed is None:
     seed = random.SystemRandom().getrandbits(32)
 seed %= 2**32
-maskedSeed = hashlib.md5(str(seed).encode()).hexdigest().upper()[:8]
-
-if args.mask_seed:
-    print("RNG seed (masked): {}".format(maskedSeed))
-    if args.verbose:
-        print("RNG seed (unmasked): {}".format(seed))
-else:
-    print("RNG seed: {}".format(seed))
-print("Randomizer flags: {}".format((randomizerFlags if randomizerFlags else "-")))
 rng.seed(seed)
 
 # Always do the coin flip, even if we're going to override the result.
@@ -202,15 +204,32 @@ elif bossRushType == "scattered":
     placeholderIndex = mapNumbers.index(BOSS_RUSH_PLACEHOLDER)
     mapNumbers[placeholderIndex] = 0x701
 
+# Calculate the seed hash.
+seedInfo = ",".join([randomizerVersion, str(seed)])
+seedHash = hashlib.md5(seedInfo.encode()).hexdigest().upper()[:8]
+
+# Print the basic seed details.
+print("RNG seed: {}".format(("(masked)" if args.mask_seed else seed)))
+print("Seed hash: {}".format(seedHash))
+print("Randomizer flags: {}".format((randomizerFlags if randomizerFlags else "-")))
+
 # If we're in verbose mode, print the spoiler log.
 if args.verbose:
+    print("---------------------------------------")
+    if args.mask_seed:
+        print("Unmasked seed: {}".format(seed))
     print("Marahna II path: {}".format(marahnaPath))
     print("Boss rush type: {}".format(bossRushType))
     for i, mapNumber in enumerate(mapNumbers, 1):
-        print("{:3X} ".format(mapNumber), end="")
-        if i % 10 == 0:
+        print("{:3X}".format(mapNumber), end="")
+        if i % 10 != 0 and i != len(mapNumbers):
+            print(" ", end="")
+        else:
             print()
-    print()
+    print("---------------------------------------")
+
+# Print a trailing newline.
+print()
 
 # Add the end credits as the last map.
 mapNumbers.append(0x801)
@@ -238,24 +257,38 @@ if not args.dry_run:
     # Look for map metadata at 0xF8000 instead of 0x28000.
     romBytes[0x13E29] = 0x1F
 
-    # Make the initial menu only have "START" as an option.
+    # Display the seed hash and randomizer version on the title screen.
+    # (Prepend the new line to the existing copyright/license text.)
+    struct.pack_into("<H", romBytes, 0x1271C, 0x1500)
+    struct.pack_into("<H", romBytes, 0x1271F, 0xA9BF)
+    titleString = "  {:<8.8s}  {:>17.17s}\x0D\x0D".format(seedHash, "v." + randomizerVersion)
+    titleBytes = titleString.encode("ascii")
+    struct.pack_into("{}s".format(len(titleBytes)), romBytes, 0x129BF, titleBytes)
+
+    # Always show exactly one option on the title screen menu.
+    # (ActRaiser does this to show "> START" when there's no save data.)
     romBytes[0x1270D] = 0xEA # NOP
     romBytes[0x1270E] = 0xEA # NOP
-    # Print the menu option starting at the left side of the screen.
-    romBytes[0x12712] = 0x00
-    # We need more space than the "START" option text provides, so we'll
-    # repurpose the space used by the "CONTINUE" / "NEW GAME" option text.
-    struct.pack_into("<H", romBytes, 0x12715, 0xA9A7)
+    # Print the one option starting at row 0x11, column 0x00.
+    # (Original print location was row 0x12, column 0x0C.)
+    struct.pack_into("<H", romBytes, 0x12712, 0x1100)
+    # Change the one option's text to show the selected seed and flags.
+    # We need more space to store the seed-and-flags string, so let's
+    # repurpose the space used by the menu-cursor strings at 0x12A34.
+    struct.pack_into("<H", romBytes, 0x12715, 0xAA34)
     if args.mask_seed:
-        menuString = "> *{}+".format(maskedSeed)
+        # ActRaiser's character set doesn't always match ASCII.
+        # "*" (0x2A) is an opening double-quote (U+201F).
+        # "+" (0x2B) is a closing double-quote (U+201D).
+        menuString = "> *{}+".format(seedHash)
     else:
         menuString = "> {}".format(seed)
     if randomizerFlags:
         menuString += "-{}".format(randomizerFlags)
     menuBytes = menuString.center(32).encode("ascii")
-    struct.pack_into("{}s".format(len(menuBytes) + 1), romBytes, 0x129A7, menuBytes)
+    struct.pack_into("{}s".format(len(menuBytes) + 1), romBytes, 0x12A34, menuBytes)
 
-    # Always enter Professional Mode from the initial menu.
+    # Always enter Professional Mode from the title screen menu.
     romBytes[0x40] = 0xEA # NOP
     romBytes[0x41] = 0xEA # NOP
 
@@ -615,7 +648,7 @@ if not args.dry_run:
     outFileName = args.output_file
     if outFileName is None:
         if args.mask_seed:
-            suffix = "_x{}x".format(maskedSeed)
+            suffix = "_x{}x".format(seedHash)
         else:
             suffix = "_{}".format(seed)
         if randomizerFlags:

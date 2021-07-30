@@ -41,6 +41,7 @@ Randomizer for ActRaiser's Professional Mode
      python actraiser_randomizer.py -s 3816547290 "ActRaiser (USA).sfc"
 
      RNG seed: 3816547290
+     Seed hash: 8938D037
      Randomizer flags: -
      ```
 * To mask the seed in the resulting ROM (i.e. for a race seed, to prevent cheating), use `-m`
@@ -48,7 +49,8 @@ Randomizer for ActRaiser's Professional Mode
      ```
      python actraiser_randomizer.py -s 3816547290 -m "ActRaiser (USA).sfc"
 
-     RNG seed (masked): 5E3E6F8B
+     RNG seed: (masked)
+     Seed hash: 8938D037
      Randomizer flags: -
      ```
 * To view the spoiler log for the resulting ROM, use `-v`
@@ -58,7 +60,9 @@ Randomizer for ActRaiser's Professional Mode
      python actraiser_randomizer.py -s 3816547290 -v "ActRaiser (USA).sfc"
 
      RNG seed: 3816547290
+     Seed hash: 8938D037
      Randomizer flags: -
+     ---------------------------------------
      Marahna II path: right
      Boss rush type: scattered
      406 204 208 301 202 502 504 704 702 102
@@ -66,6 +70,7 @@ Randomizer for ActRaiser's Professional Mode
      304 401 207 601 705 303 101 407 707 508
      505 607 605 606 706 203 405 403 604 501
      703 305 302 404 201 701 507 602
+     ---------------------------------------
      ```
 * To perform a dry-run (do all the randomization, but don't generate a new ROM), use `-n`
    * This can be useful with `-s` and `-v` to preview the outcome for a given seed.
