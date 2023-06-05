@@ -16,7 +16,7 @@ import textwrap
 # Update this with each new release.
 # Add a suffix (e.g. "/b", "/c") if there's more than one release in a day.
 # Title screen space is limited, so don't use more than 15 characters.
-randomizerVersion = "2021-07-30"
+randomizerVersion = "2023-06-05"
 
 # Process the command line arguments.
 parser = argparse.ArgumentParser(
@@ -60,6 +60,13 @@ initialLivesGroup.add_argument(
     const = "unlimited",
     dest = "initial_lives",
     help = "play with unlimited lives",
+)
+initialLivesGroup.add_argument(
+    "-D", "--death-count",
+    action = "store_const",
+    const = "deathcount",
+    dest = "initial_lives",
+    help = "show death count instead of lives remaining",
 )
 parser.add_argument(
     "-Z", "--zantetsuken",
@@ -130,6 +137,8 @@ if args.initial_lives == "extra":
     randomizerFlags += "E"
 elif args.initial_lives == "unlimited":
     randomizerFlags += "U"
+elif args.initial_lives == "deathcount":
+    randomizerFlags += "D"
 
 if args.zantetsuken:
     randomizerFlags += "Z"
@@ -346,21 +355,55 @@ if not args.dry_run:
     struct.pack_into("<H", romBytes, 0x10E86, 0x0030)
     struct.pack_into("<H", romBytes, 0x10E88, 0x0000)
 
-    # Handle the "extra lives" and "unlimited lives" cases.
+    # Handle the "extra lives", "unlimited lives", and "death count" cases.
     if args.initial_lives == "extra":
         # The value in memory is BCD and one less than the displayed value.
         # e.g. 0x09 --> 9 decimal --> 10 lives shown on the HUD
         romBytes[0x12B14] = 0x09
     elif args.initial_lives == "unlimited":
         # Update the HUD to always show 99 lives remaining.
+        # Tens digit
         romBytes[0x1428E] = 0xA9 # LDA #$39
         romBytes[0x1428F] = 0x39
+        # Ones digit
         romBytes[0x1429E] = 0xA9 # LDA #$39
         romBytes[0x1429F] = 0x39
         # Upon death, don't reduce the number of lives remaining.
         romBytes[0x2B0] = 0xEA # NOP
         romBytes[0x2B1] = 0xEA # NOP
         romBytes[0x2B2] = 0xEA # NOP
+    elif args.initial_lives == "deathcount":
+        # Start with zero deaths.
+        romBytes[0x12B14] = 0x00
+        # On the HUD, change the heart icon to a slash.
+        # (Visual indicator of deathcount mode.)
+        romBytes[0x10E8A] = 0x2F
+        # On the HUD, display "deathcount" instead of "deathcount + 1".
+        # Tens digit
+        romBytes[0x14285] = 0xEA # NOP
+        romBytes[0x14286] = 0xEA # NOP
+        romBytes[0x14287] = 0xEA # NOP
+        # Ones digit
+        romBytes[0x14297] = 0xEA # NOP
+        romBytes[0x14298] = 0xEA # NOP
+        romBytes[0x14299] = 0xEA # NOP
+        # Upon death, increment the death count.
+        # (The function we're calling handles the "99 + 1" case.)
+        romBytes[0x2AD] = 0x20 # JSR $8850
+        romBytes[0x2AE] = 0x50
+        romBytes[0x2AF] = 0x88
+        romBytes[0x2B0] = 0xEA # NOP
+        romBytes[0x2B1] = 0xEA # NOP
+        romBytes[0x2B2] = 0xEA # NOP
+        romBytes[0x2B3] = 0xEA # NOP
+        romBytes[0x2B4] = 0xEA # NOP
+        romBytes[0x2B5] = 0xEA # NOP
+        # Don't go to the "Game Over" screen if you die with zero deaths.
+        romBytes[0x13D1B] = 0x80 # BRA (replacing BNE)
+        # Don't change the death count when you collect a 1-Up.
+        romBytes[0x7C7] = 0xEA # NOP
+        romBytes[0x7C8] = 0xEA # NOP
+        romBytes[0x7C9] = 0xEA # NOP
 
     # Update the HUD's fixed content to not show ten MP scrolls.
     # For some reason, the fixed content has the variable fields filled in
