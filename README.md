@@ -7,7 +7,7 @@ Randomizer for ActRaiser's Professional Mode
       * `py --version`
       * `python --version`
       * `python3 --version`
-   * If one of these returns a Python 3.x version string (e.g. `Python 3.11.2`), you should be good to go.
+   * If one of these returns a Python 3.x version string (e.g. `Python 3.13.2`), you should be good to go.
    * If not, [download and install Python](https://www.python.org/downloads/).
 1. Click the green "Code" button at the upper right of this repository page, then "Download ZIP".
 1. Extract the ZIP archive's contents to a convenient directory.
@@ -28,8 +28,10 @@ Randomizer for ActRaiser's Professional Mode
 ## Usage
 * Open a command prompt and navigate to the directory with the randomizer files and ActRaiser (USA) ROM.<br/>
   These examples assume the ROM file name is: `ActRaiser (USA).sfc`
-* To see the randomizer's own usage text:
+* To see the randomizer's own help text:
    * `py actraiser_randomizer.py -h`
+* To see the randomizer's version:
+   * `py actraiser_randomizer.py -v`
 * To generate a randomized ROM with no particular settings:
    * `py actraiser_randomizer.py "ActRaiser (USA).sfc"`
    * This will generate a randomized ROM named: `ActRaiser (USA)_SEED.sfc`
@@ -40,28 +42,24 @@ Randomizer for ActRaiser's Professional Mode
      ```
      py actraiser_randomizer.py -s 3816547290 "ActRaiser (USA).sfc"
 
-     RNG seed: 3816547290
-     Seed hash: 465E42D7
-     Randomizer flags: -
+     Version: YYYY-MM-DD
+     Seed: 3816547290
+     Flags: -
+     Hash: XXXXXXXX
      ```
-* To mask the seed in the resulting ROM (i.e. for a race seed, to prevent cheating), use `-m`
+* To generate a race seed with a hidden seed value, use `-r`
+   * This will generate a randomized ROM named: `ActRaiser (USA)_RACE_HASH.sfc`
+   * You cannot specify a seed with `-s` when generating a race seed.
+* To view the spoiler log for the resulting ROM, use `-l`
+   * You cannot view the spoiler log when generating a race seed.
    * Sample run:
      ```
-     py actraiser_randomizer.py -s 3816547290 -m "ActRaiser (USA).sfc"
+     py actraiser_randomizer.py -s 3816547290 -l "ActRaiser (USA).sfc"
 
-     RNG seed: (masked)
-     Seed hash: 465E42D7
-     Randomizer flags: -
-     ```
-* To view the spoiler log for the resulting ROM, use `-v`
-   * Note that if you've masked the seed with `-m`, the spoiler log will include the unmasked seed.
-   * Sample run:
-     ```
-     py actraiser_randomizer.py -s 3816547290 -v "ActRaiser (USA).sfc"
-
-     RNG seed: 3816547290
-     Seed hash: 465E42D7
-     Randomizer flags: -
+     Version: YYYY-MM-DD
+     Seed: 3816547290
+     Flags: -
+     Hash: XXXXXXXX
      ---------------------------------------
      Marahna II path: right
      Boss rush type: scattered
@@ -73,7 +71,7 @@ Randomizer for ActRaiser's Professional Mode
      ---------------------------------------
      ```
 * To perform a dry-run (do all the randomization, but don't generate a new ROM), use `-n`
-   * This can be useful with `-s` and `-v` to preview the outcome for a given seed.
+   * This can be useful with `-s` and `-l` to preview the outcome for a given seed.
    * In dry-run mode, the ROM file name is optional and can be omitted.
 * To start with 10 lives instead of 5, use `-E`
 * To play with unlimited lives, use `-U`
@@ -84,7 +82,7 @@ Randomizer for ActRaiser's Professional Mode
 * To specify the generated ROM's file name, use `-o OUTPUT_FILE_NAME`
 
 ## Gameplay
-* If everything worked correctly, the title screen will show the seed (or masked seed) and flags used.
+* If everything worked correctly, the title screen will show the seed, flags, hash and randomizer version.
 * The "descending ball of light brings statue to life" animation no longer happens.<br/>
   (With some starting rooms, it caused the player to take unavoidable damage.)
 * There is now a room counter in the upper-left corner, where "[ACT]" would normally be.<br/>
