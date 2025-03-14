@@ -17,7 +17,7 @@ import textwrap
 # Update this with each new release.
 # Add a suffix (e.g. "/b", "/c") if there's more than one release in a day.
 # Title screen space is limited, so don't use more than 15 characters.
-randomizerVersion = "2025-03-10"
+randomizerVersion = "2025-03-14"
 
 
 
@@ -1671,7 +1671,11 @@ def modifyROM(romBytes, titleString, mapNumbers, initialLives, zantetsuken):
 
 
 
-def generate(romBytes, seed, isRaceSeed, initialLives, zantetsuken, marahnaPath, bossRushType):
+def generate(romBytes, isRaceSeed, seed, initialLives, zantetsuken, marahnaPath, bossRushType):
+    # If we're generating a race seed, override the seed argument
+    if isRaceSeed:
+        seed = None
+
     # Flag string
     flagString = getFlagString(initialLives, zantetsuken, marahnaPath, bossRushType)
 
@@ -1852,8 +1856,8 @@ if __name__ == "__main__":
         chosenBossRushType,
     ) = generate(
         romBytes,
-        seed,
         args.race_seed,
+        seed,
         args.initial_lives,
         args.zantetsuken,
         args.marahna_path,
@@ -1885,12 +1889,11 @@ if __name__ == "__main__":
     if not args.dry_run:
         outFileName = args.output_file
         if outFileName is None:
-            if args.race_seed:
-                suffix = f"_RACE_{hashString}"
-            else:
-                suffix = f"_{seed}"
+            suffix = f"_{'RACE' if args.race_seed else seed}"
             if flagString:
                 suffix += f"_{flagString}"
+            if args.race_seed:
+                suffix += f"_{hashString}"
 
             basename, dot, extension = inFileName.rpartition(".")
             if basename and extension:

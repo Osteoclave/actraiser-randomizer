@@ -1,7 +1,12 @@
 # actraiser-randomizer
 Randomizer for ActRaiser's Professional Mode
 
-## Getting Started
+## Quick Start
+* To generate a seed without downloading or installing anything, use the web interface:
+  [osteoclave.github.io/actraiser-randomizer](https://osteoclave.github.io/actraiser-randomizer)
+* If you want to download the randomizer and generate seeds locally, read on.
+
+## Local Setup
 1. Check if you have Python installed.
    * Open a command prompt and try the following commands:
       * `py --version`
@@ -48,7 +53,6 @@ Randomizer for ActRaiser's Professional Mode
      Hash: XXXXXXXX
      ```
 * To generate a race seed with a hidden seed value, use `-r`
-   * This will generate a randomized ROM named: `ActRaiser (USA)_RACE_HASH.sfc`
    * You cannot specify a seed with `-s` when generating a race seed.
 * To view the spoiler log for the resulting ROM, use `-l`
    * You cannot view the spoiler log when generating a race seed.

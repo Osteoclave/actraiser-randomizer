@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ActRaiser Randomizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  </head>
+  <body>
+    <div id="loading">
+      <div class="position-absolute top-50 start-50 translate-middle">
+        <div class="spinner-border" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
+    <div id="application" style="display: none;">
+      <div class="container-fluid p-3">
+        <div class="card border-primary mx-auto" style="max-width: 480px;">
+          <div class="card-header text-bg-primary">
+            <div class="d-flex justify-content-between">
+              <div class="h5 mb-0">ActRaiser Randomizer</div>
+              <div id="version" class="h5 mb-0"></div>
+            </div>
+          </div>
+          <div class="card-body" style="padding-top: 0.75rem;">
+            <div class="mb-3">
+              <div class="mb-1">ActRaiser (USA) ROM</div>
+              <div class="d-flex">
+                <input id="fileName" type="file" accept=".sfc" hidden>
+                <button id="fileButton" type="button" class="btn flex-grow-1 me-2"></button>
+                <button id="clearFileName" type="button" class="btn btn-primary">Clear</button>
+              </div>
+            </div>
+            <div class="mb-3">
+              <div class="mb-1">Seed</div>
+              <div class="d-flex">
+                <div class="btn-group me-2" role="group">
+                  <input id="raceSeed" name="seedGroup" type="radio" class="btn-check" autocomplete="off">
+                  <label for="raceSeed" class="btn btn-outline-primary">Race</label>
+                  <input id="customSeed" name="seedGroup" type="radio" class="btn-check" autocomplete="off" checked>
+                  <label for="customSeed" class="btn btn-outline-primary">Custom</label>
+                </div>
+                <div id="seedCustomizer" class="d-flex flex-grow-1">
+                  <input id="seed" type="text" inputmode="numeric" class="form-control me-2">
+                  <button id="newSeed" type="button" class="btn btn-primary">New</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="mb-1">Options</div>
+            </div>
+            <div class="border p-1 mb-3">
+              <div style="display: grid; grid-template-columns: max-content auto; gap: 0.25rem 0.5rem; padding-left: 2rem;">
+                <div style="justify-self: end; align-self: center;">
+                  <label for="initialLives" style="padding-right: 0.5rem; margin-right: -0.5rem;">Start with</label>
+                </div>
+                <div>
+                  <select id="initialLives" name="initialLives" class="form-select">
+                    <option value="default" selected>5 lives</option>
+                    <option value="extra">10 lives</option>
+                    <option value="unlimited">Unlimited lives</option>
+                    <option value="deathcount">Death counter</option>
+                  </select>
+                </div>
+                <div style="justify-self: end; align-self: center;">
+                  <label for="zantetsuken" style="padding-right: 0.5rem; margin-right: -0.5rem;">Sword upgrade</label>
+                </div>
+                <div>
+                  <select id="zantetsuken" name="zantetsuken" class="form-select">
+                    <option value="off" selected>Off</option>
+                    <option value="on">On</option>
+                  </select>
+                </div>
+                <div style="justify-self: end; align-self: center;">
+                  <label for="marahnaPath" style="padding-right: 0.5rem; margin-right: -0.5rem;">Marahna II path</label>
+                </div>
+                <div>
+                  <select id="marahnaPath" name="marahnaPath" class="form-select">
+                    <option value="left">Force left</option>
+                    <option value="random" selected>Random</option>
+                    <option value="right">Force right</option>
+                  </select>
+                </div>
+                <div style="justify-self: end; align-self: center;">
+                  <label for="bossRushType" style="padding-right: 0.5rem; margin-right: -0.5rem;">Boss rush type</label>
+                </div>
+                <div>
+                  <select id="bossRushType" name="bossRushType" class="form-select">
+                    <option value="consecutive">Consecutive</option>
+                    <option value="random" selected>Random</option>
+                    <option value="scattered">Scattered</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="d-flex justify-content-between">
+                <button id="generate" type="button" class="btn btn-primary" disabled>
+                  <span id="generateSpinner" class="d-none me-2">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                  </span>
+                  <span id="generateText" role="status">Generate</span>
+                </button>
+                <a href="https://github.com/Osteoclave/actraiser-randomizer" target="_blank" class="btn btn-secondary">GitHub</a>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer border-primary">
+            <div class="d-inline-flex">
+              <div id="statusIcon" class="me-2" aria-hidden="true"></div>
+              <div id="statusMessage" role="status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="web_interface.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  </body>
+</html>
